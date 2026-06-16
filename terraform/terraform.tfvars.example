@@ -1,0 +1,6 @@
+# Copy file ini ke terraform.tfvars dan isi sesuai project GCP kamu
+# cp terraform.tfvars.example terraform.tfvars
+
+project_id  = "your-gcp-project-id"
+region      = "asia-southeast2"
+environment = "dev"
