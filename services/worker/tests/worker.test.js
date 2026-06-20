@@ -26,7 +26,7 @@ jest.mock('@google-cloud/firestore', () => {
   };
 });
 
-const app = require('../src/index');
+const app = require('../src/app');
 
 describe('Worker - Health Check', () => {
   test('GET /health harus balik status ok', async () => {

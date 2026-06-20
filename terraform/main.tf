@@ -81,7 +81,7 @@ module "worker" {
   image               = "${var.region}-docker.pkg.dev/${var.project_id}/app-repo/worker:latest"
   service_account     = module.iam.cloud_run_sa_email
   env_vars = {
-    PYTHON_ENV  = "production"
+    NODE_ENV    = "production"
     GCP_PROJECT = var.project_id
   }
   depends_on = [module.artifact_registry, module.iam]
