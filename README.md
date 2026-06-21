@@ -1,34 +1,32 @@
-# GCP Cloud Platform
+# Cloud Task Engine: GCP Microservices Platform
 
-Tiga microservice yang di-deploy ke Google Cloud Platform menggunakan Terraform dan GitHub Actions. API Gateway dan Worker pakai Node.js, Scheduler pakai Go. Database pakai Firestore. Semua jalan gratis di GCP Free Tier.
+This project is a serverless **microservices** architecture deployed to Google Cloud Platform (GCP). It leverages Node.js for the API Gateway and Worker services, and Go for the Scheduler service. Infrastructure provisioning is managed via Terraform (IaC), and automated CI/CD deployment is handled by GitHub Actions. The system is designed to run entirely for free under the GCP Free Tier limit.
 
----
-
-## Arsitektur
+## System Architecture
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                         Developer                            │
 │                      git push main                           │
-└──────────────────────┬───────────────────────────────────────┘
-                        │
-                        ▼
-┌──────────────────────────────────────────────────────────────┐
-│                    GitHub Actions                            │
-│                                                              │
-│  ┌─────────────┐   ┌──────────────┐   ┌──────────────────┐  │
-│  │  Terraform  │──▶│ Docker Build │──▶│  Deploy Cloud    │  │
-│  │   Apply     │   │ & Push Image │   │      Run         │  │
-│  └─────────────┘   └──────────────┘   └──────────────────┘  │
-└──────────────────────────────────────────────────────────────┘
-                        │
-                        ▼
+│                      └──────┬────────────────────────────────┘
+│                             │
+│                             ▼
+│ ┌──────────────────────────────────────────────────────────┐ │
+│ │                    GitHub Actions                        │ │
+│ │  ┌─────────────┐   ┌──────────────┐   ┌────────────────┐ │ │
+│ │  │  Terraform  │──>│ Docker Build │──>│  Deploy Cloud  │ │ │
+│ │  │   Apply     │   │ & Push Image │   │      Run       │ │ │
+│ │  └─────────────┘   └──────────────┘   └────────────────┘ │ │
+│ └───────────────────────────┬──────────────────────────────┘ │
+└─────────────────────────────┼────────────────────────────────┘
+                              │
+                              ▼
 ┌──────────────────────────────────────────────────────────────┐
 │                      GCP Project                             │
 │                                                              │
 │   ┌─────────────────────────────────────────────────────┐   │
 │   │              Artifact Registry                      │   │
-│   │         (menyimpan Docker images)                   │   │
+│   │         (Stores Docker Images)                      │   │
 │   └─────────────────────────────────────────────────────┘   │
 │                                                              │
 │   ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │
@@ -36,7 +34,7 @@ Tiga microservice yang di-deploy ke Google Cloud Platform menggunakan Terraform 
 │   │  Cloud Run   │  │  Cloud Run   │  │   Cloud Run      │  │
 │   │  (Node.js)   │  │  (Node.js)   │  │      (Go)        │  │
 │   │              │  │              │  │                  │  │
-│   │ CRUD items   │  │ Proses job   │  │ Kelola jadwal    │  │
+│   │ CRUD items   │  │ Processes job│  │ Manages schedule │  │
 │   └──────┬───────┘  └──────┬───────┘  └────────┬─────────┘  │
 │          │                 │                   │            │
 │          └─────────────────┴───────────────────┘            │
@@ -52,445 +50,238 @@ Tiga microservice yang di-deploy ke Google Cloud Platform menggunakan Terraform 
 └──────────────────────────────────────────────────────────────┘
 ```
 
-Semua Cloud Run service **scale to zero** saat tidak ada traffic — tidak ada biaya saat idle.
+All Cloud Run services are configured with `min_instances = 0` (scale to zero), meaning they scale down to zero instances when idle to prevent incurring any billing costs.
 
----
+## Service Breakdown
 
-## Penjelasan Tiap Service
+* **API Gateway (Node.js)**: The main entry point. Receives external HTTP requests and performs CRUD operations on the `items` collection in Firestore (Local Port: 3000).
+* **Worker (Node.js)**: Asynchronously processes heavy background jobs and saves the results in the Firestore `job_results` collection (Local Port: 3001). This service is private and only accessible by authorized service accounts (like the Scheduler).
+* **Scheduler (Go)**: Stores scheduled tasks in the Firestore `scheduled_jobs` collection. When triggered periodically via the `/run` endpoint, it queries due tasks and dispatches them to the Worker using Google OIDC tokens for secure inter-service authentication (Local Port: 3002).
 
-**API Gateway (Node.js)** — pintu masuk utama. Menerima request dari luar dan melakukan operasi CRUD ke koleksi `items` di Firestore. Port 3000 saat lokal.
-
-**Worker (Node.js)** — menerima job, memprosesnya, lalu menyimpan hasilnya ke Firestore koleksi `job_results`. Di project nyata bisa dipakai untuk mengirim email, resize gambar, generate laporan. Port 3001 saat lokal.
-
-**Scheduler (Go)** — menyimpan job yang dijadwalkan ke koleksi `scheduled_jobs`. Endpoint `/run` dipanggil periodik (lewat Cloud Scheduler atau cron) untuk mengeksekusi job yang sudah waktunya jalan. Port 3002 saat lokal.
-
----
-
-## Struktur Repository
+## Project Directory Structure
 
 ```
-gcp-platform/
+cloud-task-engine/
 │
 ├── README.md
-├── .gitignore
+├── start.bat                   Windows batch script to run all services locally
+├── start_services.ps1          PowerShell helper script for local execution
+├── key.json                    GCP Service Account credentials file (gitignored)
 │
-├── terraform/
-│   ├── main.tf                    Entry point, panggil semua module
-│   ├── variables.tf               Input: project_id, region
-│   ├── outputs.tf                 Output: URL tiap service
-│   ├── terraform.tfvars.example   Template konfigurasi
-│   └── modules/
-│       ├── cloud-run/             Module reusable deploy Cloud Run
-│       ├── firestore/             Provision Firestore database
-│       ├── iam/                   Service accounts & permissions
-│       └── artifact-registry/    Docker registry + cleanup policy
+├── terraform/                  Infrastructure as Code (IaC) configuration
+│   ├── main.tf                 Main module connector
+│   ├── variables.tf            Input variable definitions
+│   ├── outputs.tf              Cloud Run output URLs
+│   └── modules/                Sub-modules (Cloud Run, Firestore, IAM, Registry)
 │
-├── services/
-│   ├── api-gateway/               Node.js
-│   │   ├── src/app.js             Express app: route & logika
-│   │   ├── src/index.js           Entry point, jalankan server
-│   │   ├── tests/api.test.js      Unit test
-│   │   ├── package.json
-│   │   └── Dockerfile
-│   │
-│   ├── worker/                    Node.js
-│   │   ├── src/index.js           Express app, job processor
-│   │   ├── tests/worker.test.js   Unit test
-│   │   ├── package.json
-│   │   └── Dockerfile
-│   │
-│   └── scheduler/                 Go
-│       ├── main.go                HTTP server, job scheduler
-│       ├── main_test.go           Unit test
-│       ├── go.mod
-│       └── Dockerfile
+├── services/                   Application Source Code
+│   ├── api-gateway/            API Gateway Service (Node.js) + `.env.example`
+│   ├── worker/                 Background Worker Service (Node.js) + `.env.example`
+│   └── scheduler/              Scheduler Service (Go) + `.env.example`
 │
 └── .github/
     └── workflows/
-        └── deploy.yml             Pipeline CI/CD
+        └── deploy.yml          CI/CD automated deployment workflow to GCP
 ```
 
 ---
 
-## Bagian 1 — Setup & Testing Lokal
-
-### Yang Perlu Diinstall
-
-**Node.js v18+** (untuk api-gateway & worker)
-```bash
-node --version
-npm --version
-```
-Kalau belum ada, download di [nodejs.org](https://nodejs.org), pilih versi LTS.
-
-**Go v1.21+** (untuk scheduler)
-```bash
-go version
-```
-Kalau belum ada, download di [go.dev/dl](https://go.dev/dl/), atau Mac: `brew install go`.
-
-**gcloud CLI** (untuk Firestore Emulator)
-```bash
-gcloud --version
-gcloud components install cloud-firestore-emulator
-```
-Download di [cloud.google.com/sdk/docs/install](https://cloud.google.com/sdk/docs/install) kalau belum ada.
-
-**Java v11+** (dibutuhkan oleh emulator)
-```bash
-java --version
-
-# Ubuntu/Debian:
-sudo apt install openjdk-17-jre
-# Mac:
-brew install openjdk
-```
-
----
-
-### Clone & Install Dependencies
-
-```bash
-git clone https://github.com/username/gcp-platform.git
-cd gcp-platform
-
-# Node.js services
-cd services/api-gateway && npm install && cd ../..
-cd services/worker && npm install && cd ../..
-
-# Go service
-cd services/scheduler && go mod tidy && cd ../..
-```
-
----
-
-### Jalankan Firestore Emulator
-
-Buka **terminal baru**, biarkan tetap jalan:
-
-```bash
-gcloud emulators firestore start --host-port=localhost:8090
-```
-
-Tunggu sampai muncul:
-```
-[firestore] Dev App Server is now running on port 8090
-```
-
----
-
-### Jalankan Semua Service (3 terminal terpisah)
-
-**Terminal 1 — API Gateway**
-```bash
-cd services/api-gateway
-export FIRESTORE_EMULATOR_HOST=localhost:8090
-export PORT=3000
-npm start
-```
-
-**Terminal 2 — Worker**
-```bash
-cd services/worker
-export FIRESTORE_EMULATOR_HOST=localhost:8090
-export PORT=3001
-npm start
-```
-
-**Terminal 3 — Scheduler (Go)**
-```bash
-cd services/scheduler
-export FIRESTORE_EMULATOR_HOST=localhost:8090
-export GCP_PROJECT=local-dev
-export PORT=3002
-go run main.go
-```
-
-> `FIRESTORE_EMULATOR_HOST` memberitahu SDK Firestore (baik Node.js maupun Go) untuk pakai emulator lokal, bukan Firestore GCP sungguhan. Tidak perlu internet, tidak ada biaya.
-
----
-
-### Unit Test
-
-Test tidak butuh emulator nyala — Firestore di-mock.
-
-```bash
-# Node.js services
-cd services/api-gateway && npm test && cd ../..
-cd services/worker && npm test && cd ../..
-
-# Go service
-cd services/scheduler && go test ./... -v && cd ../..
-```
-
----
-
-### Testing Manual Pakai curl
-
-Pastikan emulator + 3 service sudah nyala dulu.
-
-**Cek semua service hidup:**
-```bash
-curl http://localhost:3000/health
-curl http://localhost:3001/health
-curl http://localhost:3002/health
-```
-
-**API Gateway — buat & ambil item:**
-```bash
-curl -X POST http://localhost:3000/api/items \
-  -H "Content-Type: application/json" \
-  -d '{"name": "laptop", "description": "buat kerja"}'
-
-curl http://localhost:3000/api/items
-```
-
-**Worker — kirim job:**
-```bash
-curl -X POST http://localhost:3001/process \
-  -H "Content-Type: application/json" \
-  -d '{"job_id": "job-001", "payload": {"type": "email"}}'
-
-curl http://localhost:3001/results/job-001
-```
-
-**Scheduler — jadwalkan & jalankan job:**
-```bash
-curl -X POST http://localhost:3002/schedule \
-  -H "Content-Type: application/json" \
-  -d '{"name": "cleanup", "run_at": "2024-01-01T00:00:00Z"}'
-
-curl http://localhost:3002/jobs
-
-curl -X POST http://localhost:3002/run
-```
-
----
-
-## Bagian 2 — Deploy ke GCP
-
-### 1. Buat GCP Project
-
-```bash
-gcloud auth login
-gcloud auth application-default login
-
-gcloud projects create your-project-id
-gcloud config set project your-project-id
-```
-
-Aktifkan billing di [console.cloud.google.com/billing](https://console.cloud.google.com/billing) — wajib meski pakai free tier, tapi tidak akan kena charge selama masih dalam limit.
-
----
-
-### 2. Provision Infrastruktur dengan Terraform
-
-```bash
-cd terraform
-cp terraform.tfvars.example terraform.tfvars
-```
-
-Edit `terraform.tfvars`, isi dengan project ID kamu:
-```hcl
-project_id  = "your-project-id"
-region      = "asia-southeast2"
-environment = "dev"
-```
-
-Jalankan:
-```bash
-terraform init
-terraform plan
-terraform apply
-```
-
-Terraform akan membuat: Firestore database, Artifact Registry repo, tiga Cloud Run service (kosong dulu, image belum ada), service account untuk Cloud Run, service account untuk GitHub Actions, dan semua IAM binding yang diperlukan.
-
-Catatan: `terraform apply` pertama kali bisa gagal kalau image Docker belum ada di Artifact Registry. Kalau itu terjadi, build & push image dulu manual (lihat langkah 3), baru `terraform apply` lagi.
-
----
-
-### 3. Build & Push Image Manual (Opsional, Sekali Saja)
-
-Kalau mau coba deploy manual dulu sebelum setup CI/CD:
-
-```bash
-gcloud auth configure-docker asia-southeast2-docker.pkg.dev
-
-# Build & push api-gateway
-cd services/api-gateway
-docker build -t asia-southeast2-docker.pkg.dev/your-project-id/app-repo/api-gateway:latest .
-docker push asia-southeast2-docker.pkg.dev/your-project-id/app-repo/api-gateway:latest
-cd ../..
-
-# Build & push worker
-cd services/worker
-docker build -t asia-southeast2-docker.pkg.dev/your-project-id/app-repo/worker:latest .
-docker push asia-southeast2-docker.pkg.dev/your-project-id/app-repo/worker:latest
-cd ../..
-
-# Build & push scheduler
-cd services/scheduler
-docker build -t asia-southeast2-docker.pkg.dev/your-project-id/app-repo/scheduler:latest .
-docker push asia-southeast2-docker.pkg.dev/your-project-id/app-repo/scheduler:latest
-cd ../..
-```
-
-Ganti `your-project-id` dengan project ID GCP kamu di semua command di atas.
-
----
-
-### 4. Setup CI/CD Otomatis (GitHub Actions)
-
-Supaya setiap `git push` otomatis build & deploy, perlu setup Workload Identity Federation — cara GitHub Actions login ke GCP tanpa menyimpan file JSON service account key.
-
-**a. Buat Workload Identity Pool:**
-```bash
-gcloud iam workload-identity-pools create "github-pool" \
-  --location="global" \
-  --display-name="GitHub Actions Pool"
-```
-
-**b. Buat Provider untuk pool tersebut:**
-```bash
-gcloud iam workload-identity-pools providers create-oidc "github-provider" \
-  --location="global" \
-  --workload-identity-pool="github-pool" \
-  --display-name="GitHub provider" \
-  --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" \
-  --issuer-uri="https://token.actions.githubusercontent.com"
-```
-
-**c. Izinkan repo GitHub kamu memakai service account:**
-```bash
-gcloud iam service-accounts add-iam-policy-binding \
-  "github-actions-sa@your-project-id.iam.gserviceaccount.com" \
-  --role="roles/iam.workloadIdentityUser" \
-  --member="principalSet://iam.googleapis.com/projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/github-pool/attribute.repository/username/gcp-platform"
-```
-Ganti `PROJECT_NUMBER` (bukan project ID — beda angka, cek lewat `gcloud projects describe your-project-id`), `username/gcp-platform` dengan path repo GitHub kamu.
-
-**d. Ambil resource name provider untuk dipakai sebagai secret:**
-```bash
-gcloud iam workload-identity-pools providers describe "github-provider" \
-  --location="global" \
-  --workload-identity-pool="github-pool" \
-  --format="value(name)"
-```
-
-**e. Tambahkan secrets di GitHub repo** (`Settings → Secrets and variables → Actions`):
-
-| Secret | Isi |
-|--------|-----|
-| `GCP_PROJECT_ID` | Project ID GCP kamu |
-| `WIF_PROVIDER` | Output dari langkah d |
-| `WIF_SERVICE_ACCOUNT` | `github-actions-sa@your-project-id.iam.gserviceaccount.com` |
-
----
-
-### 5. Push dan Deploy
-
+## GCP Deployment Guide
+
+Follow these step-by-step instructions to deploy the entire microservices stack to your Google Cloud Platform account.
+
+### Step 1: Prepare GCP Project
+1. Log in to your GCP account via terminal using the gcloud CLI.
+2. Create a new GCP project using `gcloud projects create YOUR-PROJECT-ID`.
+3. Set your active project using `gcloud config set project YOUR-PROJECT-ID`.
+4. Enable billing for the project in the GCP Console to allow resource provisioning.
+
+### Step 2: Provision Infrastructure with Terraform
+1. Navigate to the `terraform` directory in your workspace.
+2. Copy the variables template using `cp terraform.tfvars.example terraform.tfvars`.
+3. Edit the `terraform.tfvars` file and specify your configuration (enter `project_id`, `region`, and `environment`).
+4. Initialize Terraform: `terraform init`.
+5. Provision resources: `terraform apply` (this creates Firestore, Artifact Registry, IAM roles, and sets up Cloud Run placeholder services).
+
+### Step 3: Setup GitHub Actions CI/CD Secrets
+Deployments are automated on git pushes via GitHub Actions using Workload Identity Federation (WIF) for keyless GCP authentication.
+1. Create and configure a Workload Identity Pool in your GCP project using gcloud CLI.
+2. Copy the resulting WIF provider resource path.
+3. Open your GitHub repository, go to Settings -> Secrets and variables -> Actions.
+4. Add the following repository secrets:
+   * `GCP_PROJECT_ID`: Your GCP Project ID.
+   * `WIF_PROVIDER`: Your WIF provider resource path.
+   * `WIF_SERVICE_ACCOUNT`: The email address of the GitHub Actions service account created by Terraform (e.g. `github-actions-sa@your-project-id.iam.gserviceaccount.com`).
+
+### Step 4: Push and Deploy
+Commit and push your changes to your main branch to trigger the automated CI/CD deployment:
 ```bash
 git add .
-git commit -m "setup CI/CD"
+git commit -m "feat: complete configuration and deploy infrastructure"
 git push origin main
 ```
-
-Buka tab **Actions** di GitHub repo untuk lihat pipeline berjalan: Terraform apply → build image → deploy ke Cloud Run. Kalau berhasil, URL tiap service muncul di output Terraform atau di GCP Console → Cloud Run.
-
----
-
-### 6. Cek Hasil Deploy
-
-```bash
-gcloud run services list --region=asia-southeast2
-```
-
-Test API yang sudah live:
-```bash
-curl https://api-gateway-xxxxx-as.a.run.app/health
-```
-(URL asli akan beda, ambil dari output `gcloud run services list` atau Terraform output)
+Track the build and deployment progress under the **Actions** tab of your GitHub repository.
 
 ---
 
-## API Reference
+## Local Setup & Installation
 
-### API Gateway (port 3000 lokal)
-```
-GET    /health              Cek status service
-GET    /api/items           Ambil semua items (max 20)
-POST   /api/items           Buat item baru
-                            Body: { "name": "...", "description": "..." }
-GET    /api/items/:id       Ambil item by ID
-DELETE /api/items/:id       Hapus item
-```
+There are several ways to spin up the Firestore database and run the microservices locally. Choose the setup option that best fits your local environment.
 
-### Worker (port 3001 lokal)
-```
-GET    /health              Cek status service
-POST   /process             Kirim job untuk diproses
-                            Body: { "job_id": "...", "payload": {...} }
-GET    /results/:job_id     Ambil hasil job by ID
-GET    /results             Ambil semua hasil job
-```
+### Main Prerequisites
+* Node.js v18 or newer
+* Go v1.21 or newer
 
-### Scheduler (port 3002 lokal)
-```
-GET    /health              Cek status service
-POST   /schedule            Jadwalkan job baru
-                            Body: { "name": "...", "run_at": "2024-01-15T10:00:00Z" }
-GET    /jobs                Lihat semua scheduled jobs
-GET    /jobs/:id            Lihat job by ID
-POST   /run                 Eksekusi jobs yang sudah waktunya
-DELETE /jobs/:id            Hapus job
-```
+### Option A: Connecting directly to GCP Firestore (Using key.json)
+This option is recommended if you want to test database writes/reads against your real GCP Firestore instance from your local computer.
+
+1. Go to **GCP Console** -> **IAM & Admin** -> **Service Accounts**.
+2. Select your service account (e.g. `cloud-run-sa` or create a new one with the `Cloud Datastore User` role).
+3. Click the **Keys** tab -> **Add Key** -> **Create new key** -> select **JSON**.
+4. Save the downloaded credential file as **`key.json`** inside the root folder of this project.
+5. Install service dependencies:
+   ```bash
+   cd services/api-gateway && npm install && cd ../..
+   cd services/worker && npm install && cd ../..
+   cd services/scheduler && go mod tidy && cd ../..
+   ```
+6. Spin up all services automatically by double-clicking the **`start.bat`** file in the root folder, or running this in PowerShell:
+   ```powershell
+   .\start.bat
+   ```
+
+### Option B: Using Google Cloud SDK (Firestore Emulator)
+A completely offline and free option utilizing the built-in emulator from the Google Cloud CLI.
+
+1. Ensure the gcloud CLI is installed on your computer.
+2. Install the emulator component:
+   ```powershell
+   gcloud components install cloud-firestore-emulator
+   ```
+3. Start the local emulator:
+   ```powershell
+   gcloud emulators firestore start --host-port=localhost:8090
+   ```
+4. In separate terminal windows, launch each service with the emulator host environment variable:
+   * **API Gateway**:
+     ```powershell
+     cd services/api-gateway
+     $env:FIRESTORE_EMULATOR_HOST="localhost:8090"
+     npm.cmd start
+     ```
+   * **Worker**:
+     ```powershell
+     cd services/worker
+     $env:FIRESTORE_EMULATOR_HOST="localhost:8090"
+     npm.cmd start
+     ```
+   * **Scheduler**:
+     ```powershell
+     cd services/scheduler
+     $env:FIRESTORE_EMULATOR_HOST="localhost:8090"
+     $env:GCP_PROJECT="local-dev"
+     $env:WORKER_URL="http://localhost:3001"
+     go run main.go
+     ```
+
+### Option C: Using Docker (Firestore Emulator)
+An offline option if you do not want to install any local SDK binaries other than Docker.
+
+1. Ensure Docker Desktop is running on your machine.
+2. Spin up the official Google SDK container running the emulator:
+   ```powershell
+   docker run -d --name firestore-emulator -p 8090:8090 google/cloud-sdk:alpine gcloud beta emulators firestore start --host-port=0.0.0.0:8090
+   ```
+3. Connect your local services to the Docker container by setting the environment variable `$env:FIRESTORE_EMULATOR_HOST="localhost:8090"` before starting each process (refer to Option B for start commands).
+
+### Option D: Using Node.js / firebase-tools (Firestore Emulator)
+An offline option if you want to avoid installing the Google Cloud CLI or Docker.
+
+1. Ensure Java v11 or newer is installed on your computer.
+2. Run the Firebase emulator suite directly using npx:
+   ```powershell
+   npx firebase-tools emulators:start --only firestore
+   ```
+3. Connect your local services by setting `$env:FIRESTORE_EMULATOR_HOST="localhost:8090"` before running them (refer to Option B for start commands).
 
 ---
 
-## Estimasi Biaya
+## Postman Testing Documentation
 
-Semua dalam **GCP Always Free Tier** — bukan trial, permanen selama tidak melebihi limit:
+Execute the following 8 testing steps in order inside Postman to verify the end-to-end functionality of your microservices:
 
-| Service | Free Tier |
-|---------|-----------|
-| Cloud Run | 2 juta request/bulan, scale to zero saat idle |
-| Firestore | 1 GB storage, 50k read & 20k write per hari |
-| Artifact Registry | 0.5 GB |
-| Cloud Build | 120 menit/hari |
+### 1. Health Check: API Gateway
+Verifies the API Gateway (Port 3000) is running locally.
+* **Method**: `GET`
+* **Request URL**: `http://localhost:3000/health`
+* **Response**: `200 OK` with JSON body `{"status": "ok", "service": "api-gateway"}`.
+* *Screenshot Reference*: ![Health Check API Gateway](screenshots/postman-health-check.png)
 
-Total: **$0/bulan** untuk skala penggunaan portfolio/dev.
+### 2. Health Check: Worker
+Verifies the Worker (Port 3001) is running locally.
+* **Method**: `GET`
+* **Request URL**: `http://localhost:3001/health`
+* **Response**: `200 OK` with JSON body `{"status": "ok", "service": "worker"}`.
+* *Screenshot Reference*: ![Health Check Worker](screenshots/postman-worker-health.png)
 
----
+### 3. Health Check: Go Scheduler
+Verifies the Go Scheduler (Port 3002) is running locally.
+* **Method**: `GET`
+* **Request URL**: `http://localhost:3002/health`
+* **Response**: `200 OK` with JSON body `{"service": "scheduler", "status": "ok"}`.
+* *Screenshot Reference*: ![Health Check Scheduler](screenshots/postman-scheduler-health.png)
 
-## Security
+### 4. Uji API Gateway: Create New Item
+Creates a new document directly in your cloud Firestore instance.
+* **Method**: `POST`
+* **Request URL**: `http://localhost:3000/api/items`
+* **Headers**: `Content-Type: application/json`
+* **Body** (raw -> JSON):
+  ```json
+  {
+    "name": "Laptop ASUS ROG",
+    "description": "Spesifikasi gaming Core i9"
+  }
+  ```
+* **Response**: `201 Created` with JSON body containing the generated unique Firestore document ID.
+* *Screenshot Reference*: ![Create New Item](screenshots/postman-create-item.png)
 
-- **Workload Identity Federation** — GitHub Actions login ke GCP tanpa menyimpan service account key
-- **Least privilege IAM** — Cloud Run service account hanya dapat akses Firestore dan Secret Manager
-- **`.gitignore`** — file `*.tfvars`, `*.json` credential, dan `.terraform/` tidak ikut commit
+### 5. Uji API Gateway: Fetch All Items
+Retrieves all items stored in the Firestore collection.
+* **Method**: `GET`
+* **Request URL**: `http://localhost:3000/api/items`
+* **Response**: `200 OK` with a JSON array listing the items.
+* *Screenshot Reference*: ![Fetch All Items](screenshots/postman-get-items.png)
 
----
+### 6. Uji Scheduler: Schedule New Task
+Registers a scheduled background job in the system.
+* **Method**: `POST`
+* **Request URL**: `http://localhost:3002/schedule`
+* **Headers**: `Content-Type: application/json`
+* **Body** (raw -> JSON):
+  ```json
+  {
+    "name": "send-welcome-email",
+    "run_at": "2024-01-01T00:00:00Z",
+    "payload": {
+      "email": "user@example.com",
+      "subject": "Selamat Datang!"
+    }
+  }
+  ```
+* **Response**: `201 Created` showing the created job status as `pending`.
+* *Screenshot Reference*: ![Schedule New Task](screenshots/postman-schedule-job.png)
 
-## Screenshots
+### 7. Uji Scheduler: Trigger Job Execution (Run)
+Triggers the scheduler to parse due tasks and dispatch them to the Worker.
+* **Method**: `POST`
+* **Request URL**: `http://localhost:3002/run`
+* **Response**: `200 OK` showing the number of executed jobs and their IDs.
+* *Screenshot Reference*: ![Trigger Job Run](screenshots/postman-run-trigger.png)
 
-### Terraform Apply
-![Terraform Apply](screenshots/terraform-apply.png)
-
-### Cloud Run Services
-![Cloud Run Services](screenshots/cloud-run-services.png)
-
-### GitHub Actions Pipeline
-![GitHub Actions Pipeline](screenshots/github-actions-pipeline.png)
-
-### Firestore Collections
-![Firestore Collections](screenshots/firestore-collections.png)
-
-### API Response
-![API Response](screenshots/api-response.png)
-
-### Unit Test Results
-![Unit Test Results](screenshots/unit-test-results.png)
-
----
-
-*Dibuat untuk belajar cloud computing dan portfolio.*
+### 8. Uji Worker: Fetch Execution Results
+Confirms that the Worker received the dispatched job and completed the background execution.
+* **Method**: `GET`
+* **Request URL**: `http://localhost:3001/results`
+* **Response**: `200 OK` listing the finished jobs with the status `completed`.
+* *Screenshot Reference*: ![Fetch Execution Results](screenshots/postman-worker-results.png)

@@ -8,6 +8,11 @@ variable "env_vars" {
   default = {}
 }
 
+variable "is_public" {
+  type    = bool
+  default = true
+}
+
 resource "google_cloud_run_v2_service" "service" {
   name     = var.service_name
   location = var.region
@@ -51,11 +56,22 @@ resource "google_cloud_run_v2_service" "service" {
 
 # Allow public access (unauthenticated)
 resource "google_cloud_run_v2_service_iam_member" "public" {
+  count    = var.is_public ? 1 : 0
   project  = var.project_id
   location = var.region
   name     = google_cloud_run_v2_service.service.name
   role     = "roles/run.invoker"
   member   = "allUsers"
+}
+
+# Restrict to service account if is_public is false
+resource "google_cloud_run_v2_service_iam_member" "private" {
+  count    = var.is_public ? 0 : 1
+  project  = var.project_id
+  location = var.region
+  name     = google_cloud_run_v2_service.service.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:${var.service_account}"
 }
 
 output "service_url" {

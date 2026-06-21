@@ -66,6 +66,7 @@ module "api_gateway" {
   service_name        = "api-gateway"
   image               = "${var.region}-docker.pkg.dev/${var.project_id}/app-repo/api-gateway:latest"
   service_account     = module.iam.cloud_run_sa_email
+  is_public           = true
   env_vars = {
     NODE_ENV    = "production"
     GCP_PROJECT = var.project_id
@@ -80,6 +81,7 @@ module "worker" {
   service_name        = "worker"
   image               = "${var.region}-docker.pkg.dev/${var.project_id}/app-repo/worker:latest"
   service_account     = module.iam.cloud_run_sa_email
+  is_public           = false
   env_vars = {
     NODE_ENV    = "production"
     GCP_PROJECT = var.project_id
@@ -94,8 +96,10 @@ module "scheduler" {
   service_name        = "scheduler"
   image               = "${var.region}-docker.pkg.dev/${var.project_id}/app-repo/scheduler:latest"
   service_account     = module.iam.cloud_run_sa_email
+  is_public           = false
   env_vars = {
     GCP_PROJECT = var.project_id
+    WORKER_URL  = module.worker.service_url
   }
   depends_on = [module.artifact_registry, module.iam]
 }

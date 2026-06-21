@@ -8,9 +8,9 @@ terraform/override.tf
 terraform/override.tf.json
 
 # GCP credentials (JANGAN PERNAH COMMIT INI!)
-*.json
+key.json
+gcp-key.json
 service-account*.json
-gcp-key*.json
 
 # Node.js
 node_modules/
@@ -28,7 +28,10 @@ venv/
 *.exe
 *.out
 
-# OS
+# OS / Environment variables
 .DS_Store
 .env
-.env.local
+.env.*
+*.env
+!*.env.example
+!**/.env.example
