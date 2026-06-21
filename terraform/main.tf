@@ -98,8 +98,16 @@ module "scheduler" {
   service_account     = module.iam.cloud_run_sa_email
   is_public           = false
   env_vars = {
-    GCP_PROJECT = var.project_id
-    WORKER_URL  = module.worker.service_url
+    GCP_PROJECT        = var.project_id
+    WORKER_URL         = module.worker.service_url
+    QUEUE_PATH         = "projects/${var.project_id}/locations/${var.region}/queues/${google_cloud_tasks_queue.task_queue.name}"
+    CLOUD_RUN_SA_EMAIL = module.iam.cloud_run_sa_email
   }
-  depends_on = [module.artifact_registry, module.iam]
+  depends_on = [module.artifact_registry, module.iam, google_cloud_tasks_queue.task_queue]
+}
+
+resource "google_cloud_tasks_queue" "task_queue" {
+  name     = "task-queue"
+  location = var.region
+  project  = var.project_id
 }

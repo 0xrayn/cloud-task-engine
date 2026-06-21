@@ -26,6 +26,18 @@ resource "google_project_iam_member" "cloud_run_logs" {
   member  = "serviceAccount:${google_service_account.cloud_run_sa.email}"
 }
 
+resource "google_project_iam_member" "cloud_run_tasks" {
+  project = var.project_id
+  role    = "roles/cloudtasks.enqueuer"
+  member  = "serviceAccount:${google_service_account.cloud_run_sa.email}"
+}
+
+resource "google_project_iam_member" "cloud_run_tasks_user" {
+  project = var.project_id
+  role    = "roles/iam.serviceAccountUser"
+  member  = "serviceAccount:${google_service_account.cloud_run_sa.email}"
+}
+
 # Service account untuk GitHub Actions (Workload Identity Federation)
 resource "google_service_account" "github_actions_sa" {
   account_id   = "github-actions-sa"

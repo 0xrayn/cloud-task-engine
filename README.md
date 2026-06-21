@@ -181,8 +181,10 @@ A completely offline and free option utilizing the built-in emulator from the Go
      $env:FIRESTORE_EMULATOR_HOST="localhost:8090"
      $env:GCP_PROJECT="local-dev"
      $env:WORKER_URL="http://localhost:3001"
+     # QUEUE_PATH and CLOUD_RUN_SA_EMAIL are left blank in local testing
      go run main.go
      ```
+     *(Note: In local testing, Go Scheduler automatically falls back to direct HTTP calls to the Worker since Google Cloud Tasks is a cloud-only resource. This keeps local development 100% offline and free).*
 
 ### Option C: Using Docker (Firestore Emulator)
 An offline option if you do not want to install any local SDK binaries other than Docker.
