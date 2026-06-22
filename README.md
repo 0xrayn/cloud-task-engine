@@ -150,6 +150,65 @@ git push origin main
 ```
 Track the build and deployment progress under the **Actions** tab of your GitHub repository.
 
+### Step 5: Retrieve GCP Cloud Run Service URLs
+After the GitHub Actions workflow successfully deploys the microservices, retrieve the public HTTPS URLs of the Cloud Run services.
+1. Navigate to the `terraform` directory in your terminal:
+   ```bash
+   cd terraform
+   ```
+2. Run the following command to print the service URLs:
+   ```bash
+   terraform output
+   ```
+   This will output the HTTPS endpoints:
+   * `api_gateway_url`: The URL for the Node.js API Gateway.
+   * `scheduler_url`: The URL for the Go Scheduler.
+   * `worker_url`: The URL for the private Node.js Worker.
+
+### Step 6: Testing the Microservices on GCP
+Testing on GCP differs from local testing. Because Cloud Run manages the routing, there are no port numbers (services communicate securely over standard port 443 HTTPS).
+
+1. **Verify Health Status (Public Services)**:
+   * Open a browser or use Postman to send a `GET` request to `[api_gateway_url]/health` (should return `{ "status": "ok", "service": "api-gateway" }`).
+   * Send a `GET` request to `[scheduler_url]/health` (should return `{ "service": "scheduler", "status": "ok" }`).
+
+2. **Verify Worker Private Status**:
+   * Send a `GET` request to `[worker_url]/health` or `[worker_url]/results`.
+   * This should return a `403 Forbidden` error. This is the expected security behavior: the Worker Cloud Run service is private (`no-allow-unauthenticated`) and is only accessible by Google Cloud Tasks queues or authorized service accounts using OIDC tokens.
+
+3. **Schedule and Trigger Tasks**:
+   * Send a `POST` request to `[scheduler_url]/schedule` with JSON body:
+     ```json
+     {
+       "name": "gcp-sync-test",
+       "run_at": "2026-01-01T00:00:00Z",
+       "payload": {
+         "cloud_mode": true
+       }
+     }
+     ```
+     This should return `201 Created` indicating the task document is stored in Firestore with status `pending`.
+   * Send a `POST` request to `[scheduler_url]/run` to trigger task execution. The Scheduler service will read the pending task and dispatch it to the Google Cloud Tasks Queue, which securely invokes the private Worker via OIDC.
+   * Verify the task execution details by inspecting the collections (`scheduled_jobs` and `job_results`) inside the GCP Firestore console.
+
+### Step 7: Connecting the Dashboard to Deployed GCP Services
+To use the frontend dashboard with your live GCP Cloud Run environment:
+1. Open [dashboard/dashboard.js](file:///c:/Users/rayn/Documents/PROJECTS/cloud-task-engine/dashboard/dashboard.js) and update the `apiBase` variable under the state configuration to point to your public `scheduler_url`:
+   ```javascript
+   const state = {
+     theme: 'theme-glass-bento',
+     viewState: 'nominal',
+     dataSource: 'live',
+     apiBase: 'https://scheduler-xxxxxx.a.run.app', // Replace with your scheduler_url
+     ...
+   };
+   ```
+2. Start the local dashboard server:
+   ```bash
+   node dashboard/serve.js
+   ```
+3. Open `http://localhost:3050` in your web browser. The dashboard will now communicate with the GCP Firestore database through the deployed Go Scheduler Cloud Run instance.
+
 ---
 
 ## Local Setup & Installation
