@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AetherEngine // Premium Cloud Task Scheduler</title>
+  <!-- Google Fonts for Design System -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400..700;1,400..700&family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Geist+Mono:wght@100..900&family=Geist:wght@100..900&family=Inter:wght@100..900&family=Space+Grotesk:wght@300..700&family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="dashboard.css">
+  <!-- Spline 3D Viewer Component -->
+  <script type="module" src="https://unpkg.com/@splinetool/viewer@1.9.0/build/spline-viewer.js"></script>
+</head>
+<body class="theme-glass-bento">
+
+  <!-- Realtime Design System & State HUD Controller -->
+  <div class="hud-controller collapsed" id="hudController">
+    <div class="hud-header">
+      <div class="hud-title">
+        <svg class="hud-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+        </svg>
+        <span>PORTFOLIO HUD CONTROLLER</span>
+      </div>
+      <button class="hud-toggle-btn" id="hudCollapseBtn" aria-label="Expand HUD">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </button>
+    </div>
+    <div class="hud-content" id="hudContent">
+      <div class="hud-section">
+        <label class="hud-label">VISUAL DIRECTION</label>
+        <div class="hud-btn-group">
+          <button class="hud-btn" data-theme="theme-dark-editorial">
+            <span>Dark Editorial</span>
+            <span class="hud-badge">T1</span>
+          </button>
+          <button class="hud-btn active" data-theme="theme-glass-bento">
+            <span>Yellow Bento</span>
+            <span class="hud-badge">T2</span>
+          </button>
+          <button class="hud-btn" data-theme="theme-swiss-minimal">
+            <span>Swiss Minimal</span>
+            <span class="hud-badge">T3</span>
+          </button>
+        </div>
+      </div>
+      <div class="hud-section">
+        <label class="hud-label">DATA STATE SIMULATION</label>
+        <div class="hud-btn-group">
+          <button class="hud-btn" data-state="loading">Skeleton</button>
+          <button class="hud-btn" data-state="empty">Empty State</button>
+          <button class="hud-btn" data-state="error">Error State</button>
+          <button class="hud-btn active" data-state="nominal">Active Feed</button>
+        </div>
+      </div>
+      <div class="hud-section">
+        <label class="hud-label">DATA SOURCE</label>
+        <div class="hud-toggle-container">
+          <span class="toggle-text">Local Simulated Data</span>
+          <button class="hud-toggle" id="dataSourceToggle" role="switch" aria-checked="false">
+            <span class="toggle-handle"></span>
+          </button>
+          <span class="toggle-text">Live Localhost API</span>
+        </div>
+        <div class="hud-api-hint" id="apiHint">
+          Ensure Go service running on <code>:3002</code> and CORS allowed.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Primary Dashboard Layout Shell -->
+  <div class="dashboard-shell" id="dashboardShell">
+    
+    <!-- Floating Header Navigation (Dynamic position based on theme) -->
+    <header class="dashboard-header" id="dashboardHeader">
+      <div class="brand-group">
+        <div class="brand-logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+          </svg>
+        </div>
+        <div class="brand-info">
+          <h1 class="brand-title">AetherEngine</h1>
+          <span class="brand-subtitle">Distributed Task Scheduler</span>
+        </div>
+      </div>
+      <nav class="nav-links">
+        <a href="#overview" class="nav-link active" data-tab="overview">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+          <span>Overview</span>
+        </a>
+        <a href="#queues" class="nav-link" data-tab="queues">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+          <span>Queues</span>
+        </a>
+        <a href="#history" class="nav-link" data-tab="history">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+          <span>Job Logs</span>
+        </a>
+      </nav>
+      <div class="header-actions">
+        <div class="connection-badge status-connected" id="connectionBadge">
+          <span class="badge-dot"></span>
+          <span class="badge-text" id="connectionBadgeText">Simulated Local</span>
+        </div>
+        <button class="btn btn-primary" id="openCreateDrawerBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          <span>New Task</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Side Navigation Sidebar (For Dark Editorial layout) -->
+    <aside class="dashboard-sidebar" id="dashboardSidebar">
+      <div class="sidebar-brand">
+        <svg class="sidebar-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+        </svg>
+        <span>AetherEngine</span>
+      </div>
+      <ul class="sidebar-menu">
+        <li>
+          <a href="#overview" class="sidebar-item active" data-tab="overview">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+            <span>Overview</span>
+          </a>
+        </li>
+        <li>
+          <a href="#queues" class="sidebar-item" data-tab="queues">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12V8H4v4M4 12v4h16v-4M4 12h16"></path></svg>
+            <span>Active Queues</span>
+          </a>
+        </li>
+        <li>
+          <a href="#history" class="sidebar-item" data-tab="history">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            <span>Execution Logs</span>
+          </a>
+        </li>
+      </ul>
+      <div class="sidebar-footer">
+        <div class="system-time">
+          <span class="mono-label">SYS_UTC</span>
+          <span class="mono-value" id="utcClock">00:00:00</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Workspace Container -->
+    <main class="dashboard-main">
+      
+      <!-- Top banner for Swiss Minimalist style (replaces header/sidebar visual footprint) -->
+      <section class="editorial-top-band">
+        <div class="editorial-date" id="editorialDate">MONDAY, JUNE 22, 2026</div>
+        <h2 class="editorial-title">AetherEngine Scheduler System Overview</h2>
+        <p class="editorial-subtitle">A portfolio-grade monitoring dashboard for distributed workflows, queue pipelines, and serverless automation execution logs.</p>
+      </section>
+
+      <!-- Dashboard Contents -->
+      <div class="tab-content active" id="tabOverview">
+        
+        <!-- Loading State Skeleton Grid -->
+        <div class="skeleton-grid" id="skeletonGrid">
+          <div class="skeleton-card metric-skeleton"></div>
+          <div class="skeleton-card metric-skeleton"></div>
+          <div class="skeleton-card metric-skeleton"></div>
+          <div class="skeleton-card metric-skeleton"></div>
+          <div class="skeleton-card main-skeleton"></div>
+          <div class="skeleton-card feed-skeleton"></div>
+        </div>
+
+        <!-- Nominal Workspaces -->
+        <div class="dashboard-grid" id="dashboardGrid">
+          
+          <!-- KPI Overview Section (4 Cards) -->
+          <section class="kpi-panel bento-col-4">
+            <div class="kpi-card-shell" style="--card-index: 1;">
+              <div class="kpi-card" id="kpiTotal">
+                <div class="kpi-meta">
+                  <span class="kpi-label">TOTAL DISPATCHED</span>
+                  <span class="kpi-trend trend-neutral">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"></path></svg>
+                    <span>all time</span>
+                  </span>
+                </div>
+                <div class="kpi-value-row">
+                  <span class="kpi-number tabular">1,402</span>
+                </div>
+                <div class="kpi-sparkline-container">
+                  <svg class="kpi-sparkline" viewBox="0 0 100 20" preserveAspectRatio="none">
+                    <path d="M 0,10 L 10,8 L 20,12 L 30,5 L 40,15 L 50,7 L 60,6 L 70,12 L 80,4 L 90,8 L 100,2" fill="none" stroke="var(--accent)" stroke-width="1.5"></path>
+                  </svg>
+                </div>
+              </div>
+            </div>
+            
+            <div class="kpi-card-shell" style="--card-index: 2;">
+              <div class="kpi-card" id="kpiPending">
+                <div class="kpi-meta">
+                  <span class="kpi-label">CURRENTLY QUEUED</span>
+                  <span class="kpi-trend trend-up">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+                    <span>+4 items</span>
+                  </span>
+                </div>
+                <div class="kpi-value-row">
+                  <span class="kpi-number tabular" id="kpiPendingVal">12</span>
+                </div>
+                <div class="kpi-sparkline-container">
+                  <svg class="kpi-sparkline" viewBox="0 0 100 20" preserveAspectRatio="none">
+                    <path d="M 0,18 L 10,15 L 20,14 L 30,16 L 40,12 L 50,11 L 60,8 L 70,7 L 80,6 L 90,4 L 100,2" fill="none" stroke="var(--accent)" stroke-width="1.5"></path>
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div class="kpi-card-shell" style="--card-index: 3;">
+              <div class="kpi-card" id="kpiSuccess">
+                <div class="kpi-meta">
+                  <span class="kpi-label">SUCCESS RATE</span>
+                  <span class="kpi-trend trend-up">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+                    <span>+0.2%</span>
+                  </span>
+                </div>
+                <div class="kpi-value-row">
+                  <span class="kpi-number tabular">99.42%</span>
+                </div>
+                <div class="kpi-sparkline-container">
+                  <svg class="kpi-sparkline" viewBox="0 0 100 20" preserveAspectRatio="none">
+                    <path d="M 0,8 L 10,9 L 20,6 L 30,8 L 40,5 L 50,4 L 60,3 L 70,5 L 80,2 L 90,3 L 100,1" fill="none" stroke="var(--accent)" stroke-width="1.5"></path>
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div class="kpi-card-shell" style="--card-index: 4;">
+              <div class="kpi-card" id="kpiAvgTime">
+                <div class="kpi-meta">
+                  <span class="kpi-label">AVG WORKER LATENCY</span>
+                  <span class="kpi-trend trend-down">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>
+                    <span>-18ms</span>
+                  </span>
+                </div>
+                <div class="kpi-value-row">
+                  <span class="kpi-number tabular">148ms</span>
+                </div>
+                <div class="kpi-sparkline-container">
+                  <svg class="kpi-sparkline" viewBox="0 0 100 20" preserveAspectRatio="none">
+                    <path d="M 0,4 L 10,8 L 20,12 L 30,10 L 40,9 L 50,14 L 60,11 L 70,9 L 80,7 L 90,11 L 100,15" fill="none" stroke="var(--accent)" stroke-width="1.5"></path>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Left Main Block: Pending Queues & Task Logs -->
+          <div class="bento-col-3-lg" id="leftMainBlock">
+            
+            <!-- Active Pending Queue -->
+            <div class="section-card-shell" style="--card-index: 5;">
+              <section class="section-card active-queue-section">
+                <div class="card-header">
+                  <div class="card-title-group">
+                    <h3 class="card-title">Pending Jobs Queue</h3>
+                    <p class="card-description">Live scheduler polling loop monitoring task readiness thresholds.</p>
+                  </div>
+                  <div class="action-badges">
+                    <button class="btn btn-secondary btn-sm" id="runWorkerPollBtn" title="Manually trigger local poll handler">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+                      <span>Trigger /run</span>
+                    </button>
+                  </div>
+                </div>
+                <div class="queue-list" id="queueList">
+                  <!-- Javascript will render active task rows here -->
+                </div>
+                <div class="queue-empty-indicator" id="queueEmptyIndicator">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                  </svg>
+                  <span>Zero pending tasks in queue. Scheduler loop idle.</span>
+                </div>
+              </section>
+            </div>
+
+            <!-- Task History Log -->
+            <div class="section-card-shell" style="--card-index: 6;">
+              <section class="section-card history-section">
+                <div class="card-header border-bottom-0">
+                  <div class="card-title-group">
+                    <h3 class="card-title">Task History</h3>
+                    <p class="card-description">Auditable record of completed and failed automated job executions.</p>
+                  </div>
+                  <button class="btn btn-secondary btn-sm" id="exportCsvBtn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"></path></svg>
+                    <span>Export CSV</span>
+                  </button>
+                </div>
+
+                <!-- Filter Toolbar -->
+                <div class="table-toolbar">
+                  <div class="search-box">
+                    <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <input type="text" id="tableSearchInput" placeholder="Filter by Job Name or ID...">
+                  </div>
+                  <div class="toolbar-filters">
+                    <select class="select-field" id="filterStatus">
+                      <option value="all">All Statuses</option>
+                      <option value="completed">Completed</option>
+                      <option value="failed">Failed</option>
+                    </select>
+                    <select class="select-field" id="filterType">
+                      <option value="all">All Types</option>
+                      <option value="email">Email Service</option>
+                      <option value="webhook">Webhook Web Trigger</option>
+                      <option value="db_sync">Database Sync</option>
+                      <option value="backup">Data Backup</option>
+                    </select>
+                    <select class="select-field" id="sortOrder">
+                      <option value="newest">Newest First</option>
+                      <option value="oldest">Oldest First</option>
+                      <option value="fastest">Fastest Run</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Table Container -->
+                <div class="table-responsive">
+                  <table class="history-table" id="historyTable">
+                    <thead>
+                      <tr>
+                        <th scope="col">Job Identification</th>
+                        <th scope="col">Type</th>
+                        <th scope="col">Execution Scheduled</th>
+                        <th scope="col">Completed At</th>
+                        <th scope="col">Status</th>
+                        <th scope="col" class="text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="historyTableBody">
+                      <!-- Javascript will render history rows here -->
+                    </tbody>
+                  </table>
+                </div>
+
+                <!-- Table Pagination -->
+                <div class="table-pagination">
+                  <span class="pagination-info" id="paginationInfo">Showing 1-10 of 20 logs</span>
+                  <div class="pagination-controls">
+                    <button class="btn btn-secondary btn-icon-sm" id="prevPageBtn" aria-label="Previous Page">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    </button>
+                    <div class="pagination-numbers" id="paginationNumbers">
+                      <!-- Dynamic Page Numbers -->
+                    </div>
+                    <button class="btn btn-secondary btn-icon-sm" id="nextPageBtn" aria-label="Next Page">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    </button>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+          </div>
+
+          <!-- Right Sidebar: Recent Activity Feed -->
+          <div class="bento-col-1-lg">
+            
+            <!-- Interactive 3D Core Visualizer -->
+            <div class="section-card-shell visualizer-card-shell" style="--card-index: 7;">
+              <section class="section-card visualizer-section">
+                <div class="visualizer-overlay">
+                  <span class="mono-label">AETHER_CORE_3D</span>
+                  <div class="mono-value">
+                    <span class="status-dot status-dot-running"></span>
+                    <span>ACTIVE // 60 FPS</span>
+                  </div>
+                </div>
+                <spline-viewer id="splineCoreViewer" url="https://prod.spline.design/kZgZ255T4Hh8kC3V/scene.splinecode" background="transparent" loading-anim="true"></spline-viewer>
+                
+                <!-- Spline Interactive Parameter Control Bar -->
+                <div class="spline-controls">
+                  <button type="button" class="spline-ctrl-btn active" data-animation="pulse" data-speed="1.0">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 8-6 4 6 4V8Z"/><rect width="14" height="12" x="2" y="6" rx="2" ry="2"/></svg>
+                    <span>Pulse</span>
+                  </button>
+                  <button type="button" class="spline-ctrl-btn" data-animation="orbit" data-speed="2.5">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/></svg>
+                    <span>Orbit</span>
+                  </button>
+                  <button type="button" class="spline-ctrl-btn" data-animation="warp" data-speed="4.0">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                    <span>Warp</span>
+                  </button>
+                </div>
+              </section>
+            </div>
+
+            <div class="section-card-shell" style="--card-index: 8;">
+              <section class="section-card activity-section">
+                <div class="card-header">
+                  <div class="card-title-group">
+                    <h3 class="card-title">System Activities</h3>
+                    <p class="card-description">Live engine trace log events.</p>
+                  </div>
+                </div>
+                <div class="activity-feed" id="activityFeed">
+                  <!-- Javascript will render timeline items here -->
+                </div>
+              </section>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Custom Mode Display Containers -->
+        <div class="custom-state-container" id="emptyStateView">
+          <div class="empty-state-graphic">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="9" y1="9" x2="15" y2="9"></line>
+              <line x1="9" y1="13" x2="15" y2="13"></line>
+              <line x1="9" y1="17" x2="13" y2="17"></line>
+            </svg>
+          </div>
+          <h3 class="empty-state-title">No Jobs Found</h3>
+          <p class="empty-state-text">Your engine's scheduler queue is currently empty. Initialize automated workflows by scheduling a new task.</p>
+          <button class="btn btn-primary" id="emptyStateCreateBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            <span>Create First Job</span>
+          </button>
+        </div>
+
+        <div class="custom-state-container" id="errorStateView">
+          <div class="error-state-graphic">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+              <line x1="12" y1="9" x2="12" y2="13"></line>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+          </div>
+          <h3 class="error-state-title">Scheduler Connection Lost</h3>
+          <p class="error-state-text" id="errorStateText">Unable to establish secure handshake with Firestore database or regional dispatch API. Please verify local service states.</p>
+          <div class="error-actions">
+            <button class="btn btn-primary" id="errorRetryBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+              <span>Retry Handshake</span>
+            </button>
+            <button class="btn btn-secondary" id="errorFallbackBtn">
+              <span>Use Simulated Mock Data</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Footer Info -->
+      <footer class="dashboard-footer">
+        <p>AetherEngine Task Scheduler v1.4.0 — Cloud Infrastructure System Portfolio Showcase.</p>
+        <p class="reduced-motion-indicator">Reduced Motion Enabled via OS Preferences.</p>
+      </footer>
+    </main>
+
+  </div>
+
+  <!-- Quick Create Slide-over Drawer Panel -->
+  <div class="drawer-overlay" id="drawerOverlay" aria-hidden="true"></div>
+  <aside class="slide-drawer" id="slideDrawer" aria-hidden="true" role="dialog" aria-labelledby="drawerTitle">
+    <div class="drawer-header">
+      <div class="drawer-title-group">
+        <h2 class="drawer-title" id="drawerTitle">Schedule Cloud Job</h2>
+        <p class="drawer-subtitle">Dispatch automated triggers to regional cloud target queues.</p>
+      </div>
+      <button class="drawer-close-btn" id="closeCreateDrawerBtn" aria-label="Close panel">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+    
+    <form class="drawer-form" id="createJobForm" novalidate>
+      <div class="form-group">
+        <label for="taskName" class="form-label">Task Name</label>
+        <input type="text" class="input-field" id="taskName" placeholder="e.g. daily-database-pruning" required>
+        <div class="form-error" id="nameError">Job name is required and should not contain spaces.</div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="taskType" class="form-label">Job Dispatch Target</label>
+          <select class="select-field" id="taskType">
+            <option value="email">Email Service Handler</option>
+            <option value="webhook">REST Webhook Gateway</option>
+            <option value="db_sync">Database Sync Broker</option>
+            <option value="backup">Secure Data Archiver</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="taskPriority" class="form-label">Execution Priority</label>
+          <select class="select-field" id="taskPriority">
+            <option value="low">Standard / Low</option>
+            <option value="medium" selected>Default / Medium</option>
+            <option value="high">Critical / High</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="taskDelay" class="form-label">Scheduling Interval</label>
+        <select class="select-field" id="taskDelay">
+          <option value="0">Immediate Dispatch (0s delay)</option>
+          <option value="5">Delayed Trigger (5s loop)</option>
+          <option value="15">Delayed Trigger (15s loop)</option>
+          <option value="60">Delayed Trigger (60s loop)</option>
+        </select>
+        <p class="form-help">Sets when the Scheduler Go daemon picks up and runs the job.</p>
+      </div>
+
+      <div class="form-group flex-fill">
+        <label for="taskPayload" class="form-label">Payload Parameters (JSON)</label>
+        <div class="json-editor-container">
+          <textarea class="textarea-field font-mono" id="taskPayload" rows="8" spellcheck="false">{
+  "engine_id": "aether-node-alpha",
+  "dry_run": false,
+  "options": {
+    "clean_tmp": true,
+    "verbose_logs": true
+  }
+}</textarea>
+        </div>
+        <div class="form-error" id="jsonError">Invalid JSON format. Please verify braces and quotes.</div>
+      </div>
+
+      <div class="drawer-footer">
+        <button type="button" class="btn btn-secondary" id="cancelFormBtn">Discard</button>
+        <button type="submit" class="btn btn-primary" id="submitFormBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          <span>Schedule Task</span>
+        </button>
+      </div>
+    </form>
+  </aside>
+
+  <!-- Notification Toast Container -->
+  <div class="toast-container" id="toastContainer" role="live" aria-live="polite"></div>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>
