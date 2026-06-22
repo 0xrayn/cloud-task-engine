@@ -1,5 +1,5 @@
 /**
- * AetherEngine Dashboard Engine
+ * Cloud Task Engine Dashboard
  * Implements high-end UX animations, mock data simulators, live API integrations,
  * and dynamic styling states under strict anti-slop guidelines.
  */
@@ -11,7 +11,7 @@
   const state = {
     theme: 'theme-glass-bento',
     viewState: 'nominal', // nominal, loading, empty, error
-    dataSource: 'simulated', // simulated, live
+    dataSource: 'live', // simulated, live
     apiBase: 'http://localhost:3002',
     jobs: [], // Unified job list
     filteredHistory: [],
@@ -48,7 +48,7 @@
     setupEventListeners();
     applyTheme(state.theme);
     setViewState(state.viewState);
-    loadInitialData();
+    setDataSource(state.dataSource);
   });
 
   // --- CORE UI CONTROLLER FUNCTIONS ---
@@ -183,7 +183,7 @@
         if (anim === 'warp') {
           state.simulationTickRate = 600;
           showToast('Warp Speed Enabled: Dispatch engine cycle overclocked!', 'success');
-          addActivityLog('System alert: <strong>Aether Core overclocking</strong> to 4.0x frequency.', 'error');
+          addActivityLog('System alert: <strong>Engine Core overclocking</strong> to 4.0x frequency.', 'error');
         } else if (anim === 'orbit') {
           state.simulationTickRate = 1000;
           showToast('Orbit Stabilized: Queue throughput optimized (1.0s ticks).', 'info');
@@ -415,7 +415,7 @@
       state.jobs = (data.jobs || []).map(apiJob => {
         // Fallback structures
         const status = apiJob.status || 'pending';
-        const type = inferJobType(apiJob.name);
+        const type = apiJob.type || inferJobType(apiJob.name);
         return {
           id: apiJob.id || `job_${Math.random().toString(36).substr(2, 6)}`,
           name: apiJob.name || 'unnamed-task',
@@ -522,6 +522,8 @@
           body: JSON.stringify({
             name: nameVal,
             run_at: runAtTime,
+            priority: prioritySelect.value,
+            type: typeSelect.value,
             payload: payloadJson
           })
         });
@@ -1063,7 +1065,7 @@
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `aetherengine_logs_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `cloud_task_engine_logs_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

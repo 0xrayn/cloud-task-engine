@@ -25,6 +25,8 @@ type Job struct {
 	Name      string         `json:"name" firestore:"name"`
 	Status    string         `json:"status" firestore:"status"`
 	RunAt     string         `json:"run_at" firestore:"run_at"`
+	Priority  string         `json:"priority,omitempty" firestore:"priority,omitempty"`
+	Type      string         `json:"type,omitempty" firestore:"type,omitempty"`
 	Payload   map[string]any `json:"payload,omitempty" firestore:"payload,omitempty"`
 	CreatedAt string         `json:"created_at" firestore:"created_at"`
 }
@@ -57,13 +59,21 @@ func scheduleHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		Name    string         `json:"name"`
-		RunAt   string         `json:"run_at"`
-		Payload map[string]any `json:"payload"`
+		Name     string         `json:"name"`
+		RunAt    string         `json:"run_at"`
+		Priority string         `json:"priority"`
+		Type     string         `json:"type"`
+		Payload  map[string]any `json:"payload"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "body tidak valid"})
 		return
+	}
+	if req.Priority == "" {
+		req.Priority = "medium"
+	}
+	if req.Type == "" {
+		req.Type = "webhook"
 	}
 	if req.Name == "" || req.RunAt == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "name dan run_at wajib diisi"})
@@ -88,6 +98,8 @@ func scheduleHandler(w http.ResponseWriter, r *http.Request) {
 		Name:      req.Name,
 		Status:    "pending",
 		RunAt:     req.RunAt,
+		Priority:  req.Priority,
+		Type:      req.Type,
 		Payload:   req.Payload,
 		CreatedAt: time.Now().UTC().Format(time.RFC3339),
 	}
@@ -362,6 +374,19 @@ func jobsRouter(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func enableCORS(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		next(w, r)
+	}
+}
+
 func main() {
 	if projectID == "" {
 		projectID = "local-dev"
@@ -372,14 +397,15 @@ func main() {
 		port = "3002"
 	}
 
-	http.HandleFunc("/health", healthHandler)
-	http.HandleFunc("/schedule", scheduleHandler)
-	http.HandleFunc("/jobs", jobsRouter)
-	http.HandleFunc("/jobs/", jobsRouter)
-	http.HandleFunc("/run", runHandler)
+	http.HandleFunc("/health", enableCORS(healthHandler))
+	http.HandleFunc("/schedule", enableCORS(scheduleHandler))
+	http.HandleFunc("/jobs", enableCORS(jobsRouter))
+	http.HandleFunc("/jobs/", enableCORS(jobsRouter))
+	http.HandleFunc("/run", enableCORS(runHandler))
 
 	log.Printf("Scheduler running on port %s (project: %s)", port, projectID)
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		log.Fatalf("Server error: %v", err)
 	}
 }
+

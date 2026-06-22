@@ -2,6 +2,19 @@
 
 This project is a serverless **microservices** architecture deployed to Google Cloud Platform (GCP). It leverages Node.js for the API Gateway and Worker services, and Go for the Scheduler service. Infrastructure provisioning is managed via Terraform (IaC), and automated CI/CD deployment is handled by GitHub Actions. The system is designed to run entirely for free under the GCP Free Tier limit.
 
+### System Screenshots
+
+#### Dashboard Upper Section
+![Upper Dashboard](screenshots/dashboard-atas.png)
+
+#### Dashboard Lower Section
+![Lower Dashboard](screenshots/dashboard-bawah.png)
+
+#### GCP Firestore Collections
+![GCP Firestore](screenshots/firestore.png)
+
+---
+
 ## System Architecture
 
 ```
@@ -223,31 +236,62 @@ An offline option if you want to avoid installing the Google Cloud CLI or Docker
 
 ---
 
-## Dashboard User Interface (Interactive Portfolio Hub)
+## Dashboard User Interface
 
-This project features a premium, interactive scheduler dashboard built using pure HTML, custom Vanilla CSS, and state-driven Javascript. It serves as a visual portfolio piece designed to impress recruiters by adhering to strict high-end design aesthetics (avoiding generic template layouts, purple mesh gradients, and icon slops).
+This project features a live, interactive scheduler dashboard built using pure HTML, custom Vanilla CSS, and state-driven Javascript. The dashboard provides a visual interface for managing and triggering background tasks.
 
-### Dynamic Theme Switcher HUD
-The dashboard contains a floating control HUD that allows users to switch visual layouts, color spacing, and typographical structures on the fly across **three distinct visual directions**:
-1. **Dark Editorial (T1)**: Strict monospace alignment, slate-navy tone, hairline borders, single neon cyan accent, left sticky sidebar navigation.
-2. **Glassmorphism Bento (T2)**: Glass backdrop blur, glowing radial hover margins, indigo-blue gradient accent, floating header navigation.
-3. **Swiss Minimalist (T3)**: Warm cream paper styling, 90-degree corners, off-black borders, brick-red typography, asymmetrical grids, and elegant serif numbers.
+### Dashboard Layout
 
-### Core Visual & Functional Features:
-*   **KPI Metrics Cards**: Total, Pending, Success Rate, and Latency statistics utilizing monospaced digits and inline vector sparklines.
-*   **Active Job Pipeline**: Real-time progress trackers for active runs, with options to trigger manual runs (`/run`) or cancel tasks.
-*   **Log Auditor Table**: Job histories table with filter triggers by status/type, search box, pagination, and a client-side **Export CSV** download utility.
-*   **Quick Schedule Drawer**: Slide-over panel containing JSON syntax verification for automated payloads.
-*   **State Simulation HUD**: Force Skeleton Loading states, Empty states, and Error states instantly.
+#### Dashboard Upper Section
+The upper section of the dashboard consists of:
+* **Connection Status Badge**: A live status indicator in the top header that shows "Live API Loop" when the dashboard is successfully polling the local Go Scheduler.
+* **KPI Metrics Panel**: Four real-time statistics cards:
+  * **Total Dispatched**: The cumulative count of all scheduled tasks.
+  * **Currently Queued**: The current number of jobs in a pending or running state.
+  * **Success Rate**: The percentage of completed tasks relative to failed ones.
+  * **Avg Worker Latency**: The average execution latency of the background workers.
+* **3D Core Visualizer**: An interactive 3D core representation that accelerates based on active scheduling workloads.
 
-### Running the Dashboard Locally
-1. Start the microservices (Option A, B, C, or D).
-2. Spin up the dedicated static dashboard server:
+#### Dashboard Lower Section
+The lower section handles execution control and audit logging:
+* **Pending Jobs Queue**: Lists jobs currently in a pending or running state. Users can click "Trigger /run" to manually dispatch due tasks or click the cancel button to delete a scheduled job.
+* **Task History Log**: An interactive audit table for completed and failed job executions. It features text searching, filtering (by status and target type), sorting, pagination, and a client-side "Export CSV" tool.
+* **Quick Schedule Drawer**: A slide-over panel to schedule new tasks. It includes fields for task name, dispatch target type, execution priority, delay interval, and a JSON payload editor.
+
+---
+
+### API Integration and Port Design
+
+#### Why the Dashboard Connects to Port 3002
+The frontend dashboard interfaces directly with **port 3002** (Go Scheduler).
+* **Port 3002 (Go Scheduler)** acts as the coordinator for all task schedules. It handles the list and schedule requests (`GET /jobs` and `POST /schedule`), writing them to the `scheduled_jobs` collection in Firestore.
+* **Port 3001 (Worker)** is a private processor service that executes due tasks and writes results to the `job_results` collection. It does not track pending schedules, so connecting the dashboard to port 3001 would make it impossible to list or manage the active queue.
+* **Port 3000 (API Gateway)** is designed for a separate CRUD collection (`/items`) and is not involved in the task scheduler workflow. It is not integrated with the dashboard because the dashboard is focused exclusively on background jobs and queues.
+
+#### Requirements for Running the Dashboard
+To use the dashboard in live mode, you must run the backend API services (specifically Go Scheduler and Worker). If the Go Scheduler service on port 3002 is not running, the dashboard will display a connection error state and will fail to load or schedule tasks.
+
+---
+
+### Running and Testing the Frontend
+
+#### How to Install and Run
+1. Start the backend services (Go Scheduler and Worker). Ensure you have configured the `key.json` file in the root directory.
+   ```powershell
+   .\start.bat
+   ```
+2. Navigate to the dashboard directory and start the local static server:
    ```bash
    node dashboard/serve.js
    ```
-3. Open **[http://localhost:3050](http://localhost:3050)** in your browser.
-4. Toggle **Live Localhost API** in the HUD to let the dashboard poll task information directly from your running local Go Scheduler service.
+3. Open `http://localhost:3050` in your web browser. The dashboard will automatically connect to port 3002.
+
+#### How to Test
+1. Open the dashboard page. Verify that the connection badge in the header displays "Live API Loop".
+2. Click **New Task** to open the schedule drawer. Enter a task name, select a priority and dispatch target, and click **Schedule Task**.
+3. Confirm that the task appears in the **Pending Jobs Queue** card.
+4. Verify in the GCP Firestore console under the `scheduled_jobs` collection that the new task document is written.
+5. Click **Trigger /run** in the dashboard. Verify that the task executes, disappears from the pending queue, and is added to the **Task History** log as `completed`.
 
 ---
 
