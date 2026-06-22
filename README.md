@@ -29,24 +29,39 @@ This project is a serverless **microservices** architecture deployed to Google C
 │   │         (Stores Docker Images)                      │   │
 │   └─────────────────────────────────────────────────────┘   │
 │                                                              │
-│   ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │
-│   │ API Gateway  │  │    Worker    │  │    Scheduler     │  │
-│   │  Cloud Run   │  │  Cloud Run   │  │   Cloud Run      │  │
-│   │  (Node.js)   │  │  (Node.js)   │  │      (Go)        │  │
-│   │              │  │              │  │                  │  │
-│   │ CRUD items   │  │ Processes job│  │ Manages schedule │  │
-│   └──────┬───────┘  └──────┬───────┘  └────────┬─────────┘  │
-│          │                 │                   │            │
-│          └─────────────────┴───────────────────┘            │
-│                            │                                │
-│                            ▼                                │
-│                  ┌─────────────────┐                        │
-│                  │    Firestore    │                        │
-│                  │                 │                        │
-│                  │  /items         │                        │
-│                  │  /job_results   │                        │
-│                  │  /scheduled_jobs│                        │
-│                  └─────────────────┘                        │
+│   ┌──────────────┐                     ┌──────────────────┐  │
+│   │ API Gateway  │                     │    Scheduler     │  │
+│   │  Cloud Run   │                     │   Cloud Run      │  │
+│   │  (Node.js)   │                     │      (Go)        │  │
+│   │              │                     │                  │  │
+│   │ CRUD items   │                     │ Manages schedule │  │
+│   └──────┬───────┘                     └────────┬─────────┘  │
+│          │                                      │            │
+│          │                                      ▼            │
+│          │                             ┌──────────────────┐  │
+│          │                             │   Cloud Tasks    │  │
+│          │                             │     Queue        │  │
+│          │                             └────────┬─────────┘  │
+│          │                                      │            │
+│          │                                      ▼            │
+│          │                             ┌──────────────────┐  │
+│          │                             │    Worker        │  │
+│          │                             │   Cloud Run      │  │
+│          │                             │   (Node.js)      │  │
+│          │                             │                  │  │
+│          │                             │ Processes job    │  │
+│          │                             └────────┬─────────┘  │
+│          │                                      │            │
+│          └─────────────────┬────────────────────┘            │
+│                            │                                 │
+│                            ▼                                 │
+│                  ┌─────────────────┐                         │
+│                  │    Firestore    │                         │
+│                  │                 │                         │
+│                  │  /items         │                         │
+│                  │  /job_results   │                         │
+│                  │  /scheduled_jobs│                         │
+│                  └─────────────────┘                         │
 └──────────────────────────────────────────────────────────────┘
 ```
 
@@ -55,8 +70,8 @@ All Cloud Run services are configured with `min_instances = 0` (scale to zero), 
 ## Service Breakdown
 
 * **API Gateway (Node.js)**: The main entry point. Receives external HTTP requests and performs CRUD operations on the `items` collection in Firestore (Local Port: 3000).
-* **Worker (Node.js)**: Asynchronously processes heavy background jobs and saves the results in the Firestore `job_results` collection (Local Port: 3001). This service is private and only accessible by authorized service accounts (like the Scheduler).
-* **Scheduler (Go)**: Stores scheduled tasks in the Firestore `scheduled_jobs` collection. When triggered periodically via the `/run` endpoint, it queries due tasks and dispatches them to the Worker using Google OIDC tokens for secure inter-service authentication (Local Port: 3002).
+* **Worker (Node.js)**: Asynchronously processes heavy background jobs and saves the results in the Firestore `job_results` collection (Local Port: 3001). This service is private and only accessible by authorized service accounts (like Google Cloud Tasks).
+* **Scheduler (Go)**: Stores scheduled tasks in the Firestore `scheduled_jobs` collection. When triggered periodically via the `/run` endpoint, it queries due tasks and dispatches them to the **Google Cloud Tasks Queue** using OIDC tokens for secure and reliable job execution (Local Port: 3002).
 
 ## Project Directory Structure
 

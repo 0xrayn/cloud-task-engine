@@ -11,11 +11,14 @@ import (
 	"time"
 
 	"cloud.google.com/go/firestore"
-	"google.golang.org/api/idtoken"
+	cloudtasks "cloud.google.com/go/cloudtasks/apiv2"
+	taskspb "google.golang.org/genproto/googleapis/cloud/tasks/v2"
 )
 
 var projectID = os.Getenv("GCP_PROJECT")
 var workerURL = os.Getenv("WORKER_URL")
+var queuePath = os.Getenv("QUEUE_PATH")
+var cloudRunSAEmail = os.Getenv("CLOUD_RUN_SA_EMAIL")
 
 type Job struct {
 	ID        string         `json:"id,omitempty" firestore:"-"`
@@ -167,11 +170,12 @@ func deleteJobHandler(w http.ResponseWriter, r *http.Request, id string) {
 	writeJSON(w, http.StatusOK, map[string]string{"message": "job berhasil dihapus"})
 }
 
-func dispatchJob(ctx context.Context, jobID string, payload map[string]any) error {
-	if workerURL == "" {
-		log.Printf("WORKER_URL tidak dikonfigurasi, skip dispatch untuk job %s", jobID)
-		return nil
+func dispatchCloudTask(ctx context.Context, jobID string, payload map[string]any) error {
+	client, err := cloudtasks.NewClient(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create cloudtasks client: %w", err)
 	}
+	defer client.Close()
 
 	body := map[string]any{
 		"job_id":  jobID,
@@ -182,35 +186,79 @@ func dispatchJob(ctx context.Context, jobID string, payload map[string]any) erro
 		return fmt.Errorf("failed to marshal body: %w", err)
 	}
 
-	var client *http.Client
-	if os.Getenv("FIRESTORE_EMULATOR_HOST") != "" || os.Getenv("GCP_PROJECT") == "local-dev" {
-		client = &http.Client{Timeout: 10 * time.Second}
-	} else {
-		c, err := idtoken.NewClient(ctx, workerURL)
-		if err != nil {
-			return fmt.Errorf("failed to create idtoken client: %w", err)
-		}
-		client = c
+	req := &taskspb.CreateTaskRequest{
+		Parent: queuePath,
+		Task: &taskspb.Task{
+			MessageType: &taskspb.Task_HttpRequest{
+				HttpRequest: &taskspb.HttpRequest{
+					HttpMethod: taskspb.HttpMethod_POST,
+					Url:        workerURL + "/process",
+					Headers: map[string]string{
+						"Content-Type": "application/json",
+					},
+					Body: bodyBytes,
+					AuthorizationHeader: &taskspb.HttpRequest_OidcToken{
+						OidcToken: &taskspb.OidcToken{
+							ServiceAccountEmail: cloudRunSAEmail,
+						},
+					},
+				},
+			},
+		},
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, workerURL+"/process", bytes.NewReader(bodyBytes))
+	_, err = client.CreateTask(ctx, req)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to send request to worker: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("worker returned non-2xx status: %d", resp.StatusCode)
+		return fmt.Errorf("failed to create task in cloudtasks: %w", err)
 	}
 
-	log.Printf("Berhasil dispatch job %s ke worker", jobID)
+	log.Printf("Berhasil dispatch job %s via Cloud Tasks", jobID)
 	return nil
+}
+
+func dispatchJob(ctx context.Context, jobID string, payload map[string]any) error {
+	if workerURL == "" {
+		log.Printf("WORKER_URL tidak dikonfigurasi, skip dispatch untuk job %s", jobID)
+		return nil
+	}
+
+	// Jika di lokal (emulator atau local-dev), gunakan direct HTTP POST
+	if os.Getenv("FIRESTORE_EMULATOR_HOST") != "" || os.Getenv("GCP_PROJECT") == "local-dev" || queuePath == "" {
+		log.Printf("Lokal mode aktif, dispatch job %s secara langsung via HTTP", jobID)
+		
+		body := map[string]any{
+			"job_id":  jobID,
+			"payload": payload,
+		}
+		bodyBytes, err := json.Marshal(body)
+		if err != nil {
+			return fmt.Errorf("failed to marshal body: %w", err)
+		}
+
+		client := &http.Client{Timeout: 10 * time.Second}
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, workerURL+"/process", bytes.NewReader(bodyBytes))
+		if err != nil {
+			return fmt.Errorf("failed to create request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return fmt.Errorf("failed to send request to worker: %w", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return fmt.Errorf("worker returned non-2xx status: %d", resp.StatusCode)
+		}
+
+		log.Printf("Berhasil dispatch job %s ke worker via HTTP", jobID)
+		return nil
+	}
+
+	// Jika di GCP (production), kirim melalui Cloud Tasks Queue
+	log.Printf("Production mode aktif, mengirim job %s ke Cloud Tasks queue: %s", jobID, queuePath)
+	return dispatchCloudTask(ctx, jobID, payload)
 }
 
 func runHandler(w http.ResponseWriter, r *http.Request) {
