@@ -223,6 +223,34 @@ An offline option if you want to avoid installing the Google Cloud CLI or Docker
 
 ---
 
+## Dashboard User Interface (Interactive Portfolio Hub)
+
+This project features a premium, interactive scheduler dashboard built using pure HTML, custom Vanilla CSS, and state-driven Javascript. It serves as a visual portfolio piece designed to impress recruiters by adhering to strict high-end design aesthetics (avoiding generic template layouts, purple mesh gradients, and icon slops).
+
+### Dynamic Theme Switcher HUD
+The dashboard contains a floating control HUD that allows users to switch visual layouts, color spacing, and typographical structures on the fly across **three distinct visual directions**:
+1. **Dark Editorial (T1)**: Strict monospace alignment, slate-navy tone, hairline borders, single neon cyan accent, left sticky sidebar navigation.
+2. **Glassmorphism Bento (T2)**: Glass backdrop blur, glowing radial hover margins, indigo-blue gradient accent, floating header navigation.
+3. **Swiss Minimalist (T3)**: Warm cream paper styling, 90-degree corners, off-black borders, brick-red typography, asymmetrical grids, and elegant serif numbers.
+
+### Core Visual & Functional Features:
+*   **KPI Metrics Cards**: Total, Pending, Success Rate, and Latency statistics utilizing monospaced digits and inline vector sparklines.
+*   **Active Job Pipeline**: Real-time progress trackers for active runs, with options to trigger manual runs (`/run`) or cancel tasks.
+*   **Log Auditor Table**: Job histories table with filter triggers by status/type, search box, pagination, and a client-side **Export CSV** download utility.
+*   **Quick Schedule Drawer**: Slide-over panel containing JSON syntax verification for automated payloads.
+*   **State Simulation HUD**: Force Skeleton Loading states, Empty states, and Error states instantly.
+
+### Running the Dashboard Locally
+1. Start the microservices (Option A, B, C, or D).
+2. Spin up the dedicated static dashboard server:
+   ```bash
+   node dashboard/serve.js
+   ```
+3. Open **[http://localhost:3050](http://localhost:3050)** in your browser.
+4. Toggle **Live Localhost API** in the HUD to let the dashboard poll task information directly from your running local Go Scheduler service.
+
+---
+
 ## Postman Testing Documentation
 
 Execute the following 8 testing steps in order inside Postman to verify the end-to-end functionality of your microservices:

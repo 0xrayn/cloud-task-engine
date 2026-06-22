@@ -35,3 +35,8 @@ venv/
 *.env
 !*.env.example
 !**/.env.example
+
+# Agent specific folders
+.agent/
+.agents/
+skills-lock.json
